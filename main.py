@@ -1,6 +1,25 @@
 import random
 import math
+import atexit
 
+
+def write_in_file():
+    print("Program is closing, saving data...")
+    with open("data.txt", 'w', encoding='utf8') as f:
+        f.write("temperature, energy_per_site, mag_per_site, susceptibility, specific_heat, h_field")
+        f.write("\n")
+
+        for i in range(len(data_temperature)):
+            string = str(data_temperature[i]) + "," \
+                     + str(data_energy_per_site[i]) \
+                     + "," + str(data_mag_per_site[i]) \
+                     + "," + str(data_susceptibility[i]) \
+                     + "," + str(data_specific_heat[i]) \
+                     + "," + str(data_h_field[i])
+
+            f.write(string)
+            f.write("\n")
+    print("save complete")
 
 def compute_energy_site(grid, j, h_field, w, h):
     f_width = len(grid)
@@ -84,27 +103,32 @@ def compute_mag_moy_square(grid):
 
     return mag / (f_width * f_height)
 
+atexit.register(write_in_file)
 
-data_temperature = []
-data_mag_per_site = []
-data_susceptibility = []
-data_energy_per_site = []
-data_specific_heat = []
-data_h_field = []
-
-sim_step = 500000
+sim_step = 1000000
 width, height = 64, 64
-temperature_init, temperature_MAX, temperature_step = 1, 25, 0.3
+temperature_init, temperature_MAX, temperature_step = 1, 25, 0.1
 temperature = temperature_init
 spin = [1, -1]
 j = 1
-h_field_init, h_field_MAX, h_field_step = -6, 6, 0.5
+h_field_init, h_field_MAX, h_field_step = 0, 5, 0.1
 h_field = h_field_init
+
+h_field_MAX_step = int((h_field_MAX-h_field_init)/h_field_step)
+temperature_MAX_step = int(temperature_MAX/temperature_step)
 delta_energy = 0
 grid = [[0 for w in range(width)] for h in range(height)]
 
-for h in range(h_field_init, int((h_field_MAX-h_field_init)/h_field_step)):
-    for t in range(temperature_init, int(temperature_MAX/temperature_step)):
+numElement = (temperature_MAX_step) * (h_field_MAX_step)
+data_temperature = [None] * numElement
+data_mag_per_site = [None] * numElement
+data_susceptibility = [None] * numElement
+data_energy_per_site = [None] * numElement
+data_specific_heat = [None] * numElement
+data_h_field = [None] * numElement
+
+for h_f in range(1, h_field_MAX_step+1):
+    for t in range(1, temperature_MAX_step+1):
         # Initialization of the random grid
         for w in range(width):
             for h in range(height):
@@ -149,15 +173,15 @@ for h in range(h_field_init, int((h_field_MAX-h_field_init)/h_field_step)):
         susceptibility = 1 / temperature**2 * (- mag_per_site_moy**2 + mag_per_site_moy_square)
 
         # Put the data in a list
-        data_energy_per_site.append(energy_per_site_moy)
-        data_mag_per_site.append(mag_per_site_moy)
-        data_susceptibility.append(susceptibility)
-        data_temperature.append(temperature)
-        data_specific_heat.append(specific_heat)
-        data_h_field.append(h_field)
+        data_energy_per_site[h_f*t] = energy_per_site_moy
+        data_mag_per_site[h_f*t] = mag_per_site_moy
+        data_susceptibility[h_f*t] = susceptibility
+        data_temperature[h_f*t] = temperature
+        data_specific_heat[h_f*t] = specific_heat
+        data_h_field[h_f*t] = h_field
 
         temperature += temperature_step
-
+        print("(", h_f, "/", h_field_MAX_step, ")", "step", t, "from step", temperature_MAX_step)
     temperature = temperature_init
     h_field += h_field_step
 
@@ -181,7 +205,6 @@ for l in range(len(data_temperature)):
     data_susceptibility[l] = (data_susceptibility[l] - susceptibility_MIN) / (susceptibility_MAX - susceptibility_MIN)
     data_specific_heat[l] = (data_specific_heat[l] - specific_heat_MIN) / (specific_heat_MAX - specific_heat_MIN)
     data_temperature[l] /= temperature_critique
-
 print("Normalized data :")
 print("energy per site :", data_energy_per_site)
 print("magnetization per site :", data_mag_per_site)
@@ -189,26 +212,9 @@ print("susceptibility : ", data_susceptibility)
 print("specific heat :", data_specific_heat)
 print("temperature :", data_temperature)
 print("h field :", data_h_field)
-
 '''
 
 '''
 for h in range(height):
     print(grid[h])
 '''
-
-with open("data.txt", 'w', encoding='utf8') as f:
-
-    f.write("temperature, energy_per_site, mag_per_site, susceptibility, specific_heat, h_field")
-    f.write("\n")
-
-    for i in range(len(data_temperature)):
-        string = str(data_temperature[i]) + "," \
-                 + str(data_energy_per_site[i]) \
-                 + "," + str(data_mag_per_site[i]) \
-                 + "," + str(data_susceptibility[i]) \
-                 + "," + str(data_specific_heat[i]) \
-                 + "," + str(data_h_field[i])
-
-        f.write(string)
-        f.write("\n")
