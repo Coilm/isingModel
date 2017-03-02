@@ -1,9 +1,10 @@
 import random
 import math
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.tri as tri
 
-
+# used to compute only the energy change provocate by the change of spin at coordinate (w,h)
 def compute_energy_site(grid, j, h_field, w, h):
     f_width = len(grid)
     f_height = len(grid[0])
@@ -26,7 +27,7 @@ def compute_energy_site(grid, j, h_field, w, h):
 
     return energy
 
-
+# Compute the energy of the whole grid
 def compute_energy(grid, j, h_field):
     f_width = len(grid)
     f_height = len(grid[0])
@@ -38,7 +39,7 @@ def compute_energy(grid, j, h_field):
 
     return energy
 
-
+# compute <E>
 def compute_energy_moy(grid, j, h_field):
     f_width = len(grid)
     f_height = len(grid[0])
@@ -50,7 +51,7 @@ def compute_energy_moy(grid, j, h_field):
 
     return energy / (f_height * f_width)
 
-
+# Compute <E^2>
 def compute_energy_moy_square(grid, j, h_field):
     f_width = len(grid)
     f_height = len(grid[0])
@@ -62,7 +63,7 @@ def compute_energy_moy_square(grid, j, h_field):
 
     return energy / (f_height * f_width)
 
-
+# Compute <M>
 def compute_mag_moy(grid):
     f_width = len(grid)
     f_height = len(grid[0])
@@ -74,7 +75,7 @@ def compute_mag_moy(grid):
 
     return mag / (f_height * f_width)
 
-
+# Compute <M^2>
 def compute_mag_moy_square(grid):
     f_width = len(grid)
     f_height = len(grid[0])
@@ -87,21 +88,27 @@ def compute_mag_moy_square(grid):
     return mag / (f_width * f_height)
 
 
+only_one_value_hfield = False  # Used to skip the h_field loop
 sim_step = 1000000
 width, height = 64, 64
-temperature_init, temperature_MAX, temperature_step = 0.5, 8, 0.3
+temperature_init, temperature_MAX, temperature_step = 0.5, 8, 0.1
 temperature = temperature_init
 spin = [1, -1]
 j = 1
-h_field_init, h_field_MAX, h_field_step = -3, 3, 0.3
+h_field_init, h_field_MAX, h_field_step = 0.3, 2, 0.1
 h_field = h_field_init
-data_number = 0
+data_number = 0  # Used to count the number of simulation step, and to know in which case the date must be put
 h_field_MAX_step = int((h_field_MAX-h_field_init)/h_field_step)
 temperature_MAX_step = int(temperature_MAX/temperature_step)
 delta_energy = 0
 grid = [[0 for w in range(width)] for h in range(height)]
 
-numElement = temperature_MAX_step * h_field_MAX_step
+if only_one_value_hfield:
+    numElement = temperature_MAX_step
+else:
+    numElement = temperature_MAX_step * h_field_MAX_step
+
+# Preallocate the memory, for efficiency
 data_temperature = [0] * numElement
 data_mag_per_site = [0] * numElement
 data_susceptibility = [0] * numElement
@@ -167,12 +174,18 @@ for h_f in range(1, h_field_MAX_step+1):
         data_h_field[data_number-1] = h_field
 
         temperature += temperature_step
+        if only_one_value_hfield:
+            print("step", t, "from step", temperature_MAX_step, "(", round(data_number * 100 / numElement, 2), "% )")
+        else:
+            print("(", h_f, "/", h_field_MAX_step, ")", "step", t, "from step", temperature_MAX_step,
+              "(", round(data_number * 100 / numElement, 2), "% )")
 
-        print("(", h_f, "/", h_field_MAX_step, ")", "step", t, "from step", temperature_MAX_step,
-              "(", round(data_number * 100 / (h_field_MAX_step * temperature_MAX_step), 2), "% )")
+    if only_one_value_hfield:  # Go out of the loop if we only want to compute for one value of the h_field
+        break;
     temperature = temperature_init
     h_field += h_field_step
 
+# Put the data in a file, at the end of the simulation
 with open("data.txt", 'w', encoding='utf8') as f:
     f.write("temperature, energy_per_site, mag_per_site, susceptibility, specific_heat, h_field")
     f.write("\n")
@@ -189,8 +202,9 @@ with open("data.txt", 'w', encoding='utf8') as f:
         f.write("\n")
 print("save complete")
 
+
 print("Plotting graphs...")
-for k in range(len(data_temperature)):
+for k in range(len(data_temperature)): # Loop used to create data of a single value of h, for the 2D plot
     if data_h_field[k] == h_field_init:
         plot_data_temperature.append(data_temperature[k])
         plot_data_specific_heat.append(data_specific_heat[k])
@@ -198,7 +212,8 @@ for k in range(len(data_temperature)):
         plot_data_energy.append(data_energy_per_site[k])
         plot_data_mag.append(data_mag_per_site[k])
 
-triangles = tri.Triangulation(data_temperature, data_h_field)
+if only_one_value_hfield==False: # Triangulation for the 3D plot of phyiscal values vs h and T
+    triangles = tri.Triangulation(data_temperature, data_h_field)
 
 print(plot_data_mag)
 print(plot_data_energy)
@@ -223,19 +238,21 @@ plt.xlabel('Temperature')
 plt.ylabel('Energy per site')
 '''
 
-fig_2 = plt.figure(2)
+if only_one_value_hfield==False:
+    fig_2 = plt.figure(2)
 
-ax_1 = fig_2.add_subplot(111, projection='3d')
-ax_1.plot_trisurf(triangles, data_susceptibility, cmap=plt.cm.CMRmap)
-ax_1.set_xlabel('Temperature')
-ax_1.set_ylabel('h field')
-ax_1.set_zlabel('Susceptiblity')
+    ax_1 = fig_2.add_subplot(111, projection='3d')
+    ax_1.plot_trisurf(triangles, data_susceptibility, cmap=plt.cm.CMRmap)
+    ax_1.set_xlabel('Temperature')
+    ax_1.set_ylabel('h field')
+    ax_1.set_zlabel('Susceptiblity')
 
-fig_3 = plt.figure(3)
-ax_2 = fig_3.add_subplot(111, projection='3d')
-ax_2.plot_trisurf(triangles, data_specific_heat, cmap=plt.cm.CMRmap)
-ax_2.set_xlabel('Temperature')
-ax_2.set_ylabel('h field')
-ax_2.set_zlabel('Specific heat')
+    fig_3 = plt.figure(3)
+    ax_2 = fig_3.add_subplot(111, projection='3d')
+    ax_2.plot_trisurf(triangles, data_specific_heat, cmap=plt.cm.CMRmap)
+    ax_2.set_xlabel('Temperature')
+    ax_2.set_ylabel('h field')
+    ax_2.set_zlabel('Specific heat')
+
 print("Graphs plotted")
 plt.show()
